@@ -3,17 +3,17 @@ package orm;
 import jakarta.persistence.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import orm.dsl.holder.EntityIdHolder;
 import orm.exception.EntityHasNoDefaultConstructorException;
 import orm.exception.InvalidEntityException;
 import orm.exception.InvalidIdMappingException;
 import orm.settings.JpaSettings;
-import orm.util.CollectionUtils;
+import orm.validator.EntityValidator;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
  * @param <E> @Entity 어노테이션이 붙은 클래스
  */
 public class TableEntity<E> {
+
     private static final Logger logger = LoggerFactory.getLogger(TableEntity.class);
 
     private final String tableName;
@@ -37,23 +38,24 @@ public class TableEntity<E> {
     private final JpaSettings jpaSettings;
 
     public TableEntity(Class<E> entityClass, JpaSettings settings) {
-        throwIfNotEntity(entityClass);
+        this.entity = createNewInstanceByDefaultConstructor(entityClass);
+        new EntityValidator<>(entity).validate();
+
         this.jpaSettings = settings;
         this.tableName = extractTableName(entityClass);
         this.tableClass = entityClass;
-        this.entity = createNewInstanceByDefaultConstructor(entityClass);
-        this.id = extractId(entityClass);
+        this.id = extractId();
         this.allFields = extractAllPersistenceFields(entityClass);
     }
 
     public TableEntity(E entity, JpaSettings settings) {
+        new EntityValidator<>(entity).validate();
         Class<E> entityClass = (Class<E>) entity.getClass();
-        throwIfNotEntity(entityClass);
         this.jpaSettings = settings;
         this.tableName = extractTableName(entityClass);
         this.tableClass = entityClass;
         this.entity = entity;
-        this.id = extractId(entityClass);
+        this.id = extractId();
         this.allFields = extractAllPersistenceFields(entityClass);
     }
 
@@ -75,10 +77,6 @@ public class TableEntity<E> {
 
     public TablePrimaryField getId() {
         return id;
-    }
-
-    public boolean hasIdValue() {
-        return id.getFieldValue() != null;
     }
 
     public void setIdValue(Object idValue) {
@@ -137,18 +135,10 @@ public class TableEntity<E> {
      * @return TablePrimaryField ID 필드
      * @throws InvalidIdMappingException ID 필드가 없거나 2개 이상인 경우
      */
-    private TablePrimaryField extractId(Class<E> entityClass) {
-        Field[] declaredFields = entityClass.getDeclaredFields();
-
-        var idList = Arrays.stream(declaredFields)
-                .filter(field -> field.isAnnotationPresent(Id.class))
-                .toList();
-
-        if (CollectionUtils.isEmpty(idList) || idList.size() != 1) {
-            throw new InvalidIdMappingException("Entity must have one @Id field");
-        }
-
-        return new TablePrimaryField(idList.getFirst(), entity, jpaSettings);
+    private TablePrimaryField extractId() {
+        EntityIdHolder<E> entityIdHolder = new EntityIdHolder<>(entity);
+        Field idField = entityIdHolder.getIdField();
+        return new TablePrimaryField(idField, entity, jpaSettings);
     }
 
     /**
@@ -203,6 +193,7 @@ public class TableEntity<E> {
 
     /**
      * 모든 필드를 주어진 필드로 교체한다.
+     *
      * @param tableFields 교체할 필드
      */
     public void replaceAllFields(List<? extends TableField> tableFields) {
@@ -219,7 +210,6 @@ public class TableEntity<E> {
      * TableField에 세팅된 값들을 엔티티 클래스의 값에 적용한다.
      */
     public void syncFieldValueToEntity() {
-
         // non-id field들의 fieldName과 fieldValue를 매핑
         Map<String, Object> classFieldNameMap = this.getNonIdFields().stream()
                 .collect(Collectors.toMap(TableField::getClassFieldName, TableField::getFieldValue));
@@ -228,15 +218,19 @@ public class TableEntity<E> {
         classFieldNameMap.put(id.getClassFieldName(), id.getFieldValue());
 
         for (Field declaredField : tableClass.getDeclaredFields()) {
-            declaredField.setAccessible(true);
-            try {
-                Object fieldValue = classFieldNameMap.get(declaredField.getName());
-                if (fieldValue != null) {
-                    declaredField.set(entity, fieldValue);
-                }
-            } catch (IllegalAccessException e) {
-                logger.error("Cannot access field: " + declaredField.getName(), e);
+            var fieldValue = classFieldNameMap.get(declaredField.getName());
+            setFieldValue(declaredField, fieldValue);
+        }
+    }
+
+    private void setFieldValue(Field declaredField, Object fieldValue) {
+        declaredField.setAccessible(true);
+        try {
+            if (fieldValue != null) {
+                declaredField.set(entity, fieldValue);
             }
+        } catch (IllegalAccessException e) {
+            logger.error("Cannot access field: " + declaredField.getName(), e);
         }
     }
 }

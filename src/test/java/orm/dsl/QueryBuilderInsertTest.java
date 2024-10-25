@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import orm.exception.OrmPersistenceException;
 import persistence.sql.ddl.Person;
+import test_double.FakeQueryRunner;
 import test_entity.PersonWithAI;
 
 import java.util.List;
@@ -15,10 +16,12 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 public class QueryBuilderInsertTest {
 
     QueryBuilder queryBuilder;
+    QueryRunner fakeQueryRunner;
 
     @BeforeEach
     void setUp() {
         queryBuilder = new QueryBuilder();
+        fakeQueryRunner = new FakeQueryRunner();
     }
 
     @Test
@@ -28,7 +31,7 @@ public class QueryBuilderInsertTest {
         Person person = new Person(1L, 30, "설동민");
 
         // when
-        String query = queryBuilder.insertInto(Person.class)
+        String query = queryBuilder.insertInto(Person.class, fakeQueryRunner)
                 .value(person)
                 .extractSql();
 
@@ -47,7 +50,7 @@ public class QueryBuilderInsertTest {
         ) ;
 
         // when
-        String query = queryBuilder.insertInto(Person.class)
+        String query = queryBuilder.insertInto(Person.class, fakeQueryRunner)
                 .values(people)
                 .extractSql();
 
@@ -59,7 +62,7 @@ public class QueryBuilderInsertTest {
     @DisplayName("INSERT 절 bulkInsert 중복실행 테스트")
     void DML_INSERT_문_벌크_중복실행_테스트() {
         // when
-        String query = queryBuilder.insertInto(Person.class)
+        String query = queryBuilder.insertInto(Person.class, fakeQueryRunner)
                 .values(List.of(new Person(1L, 30, "설동민")))
                 .values(List.of(new Person(2L, 30, "설동민2")))
                 .extractSql();
@@ -79,7 +82,7 @@ public class QueryBuilderInsertTest {
         ) ;
 
         // when
-        String query = queryBuilder.insertInto(PersonWithAI.class)
+        String query = queryBuilder.insertInto(PersonWithAI.class, fakeQueryRunner)
                 .values(people)
                 .extractSql();
 
@@ -95,7 +98,7 @@ public class QueryBuilderInsertTest {
 
         // when & then
         assertThatThrownBy(
-                () -> queryBuilder.insertInto(PersonWithAI.class)
+                () -> queryBuilder.insertInto(PersonWithAI.class, fakeQueryRunner)
                 .values(people)
                 .extractSql()
         ).isInstanceOf(OrmPersistenceException.class)

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import test_double.FakeQueryRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static util.SQLUtil.SQL_노멀라이즈;
@@ -11,10 +12,12 @@ import static util.SQLUtil.SQL_노멀라이즈;
 public class QueryBuilderDropTest {
 
     QueryBuilder queryBuilder;
+    QueryRunner fakeQueryRunner;
 
     @BeforeEach
     void setUp() {
         queryBuilder = new QueryBuilder();
+        fakeQueryRunner = new FakeQueryRunner();
     }
 
     @Test
@@ -31,7 +34,7 @@ public class QueryBuilderDropTest {
 
         // when
         String query = SQL_노멀라이즈(
-                queryBuilder.dropTable(entityClass)
+                queryBuilder.dropTable(entityClass, fakeQueryRunner)
                         .extractSql()
         );
 
@@ -53,7 +56,7 @@ public class QueryBuilderDropTest {
 
         // when
         String query = SQL_노멀라이즈(
-                queryBuilder.dropTable(entityClass)
+                queryBuilder.dropTable(entityClass, fakeQueryRunner)
                         .ifNotExist()
                         .extractSql()
         );
