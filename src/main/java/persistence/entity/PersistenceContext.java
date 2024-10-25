@@ -4,7 +4,9 @@ public interface PersistenceContext {
 
     Object getEntity(EntityKey entityKey);
 
-    EntitySnapshot getDatabaseSnapshot(EntityKey entityKey, Object entity);
+    EntityEntry getEntityEntry(EntityKey entityKey);
+
+    EntitySnapshot getDatabaseSnapshot(EntityKey entityKey);
 
     void addEntity(EntityKey entityKey, Object entity);
 
@@ -12,5 +14,7 @@ public interface PersistenceContext {
 
     void removeEntity(EntityKey entityKey);
 
-    boolean hasEntity(Object entity, Object id);
+    boolean isEntityAbsent(Object entity, Object id);
+
+    void addEntry(EntityKey entityKey, EntityEntry entityEntry);
 }
