@@ -2,10 +2,11 @@ package persistence.entity.impl;
 
 import java.sql.Connection;
 import jdbc.TransactionalJdbcTemplate;
-import persistence.entity.EntityManger;
+import persistence.entity.EntityManager;
+import persistence.entity.EntityPersister;
 import persistence.entity.PersistenceContext;
 
-public class EntityManagerImpl implements EntityManger {
+public class EntityManagerImpl implements EntityManager {
 
     private final PersistenceContext persistenceContext;
     private final TransactionalJdbcTemplate transactionalJdbcTemplate;
@@ -37,11 +38,12 @@ public class EntityManagerImpl implements EntityManger {
 
     @Override
     public void flush() throws IllegalAccessException {
-        persistenceContext.flush();
-    }
-
-    @Override
-    public void detach(Object entity) {
+        for (Object entity : persistenceContext.getPendingEntities()) {
+            new EntityPersister<>(entity.getClass(), transactionalJdbcTemplate).insert(entity);
+        }
+        for (Object entity : persistenceContext.getPersistedEntities()) {
+            new EntityPersister<>(entity.getClass(), transactionalJdbcTemplate).update(entity);
+        }
     }
 
     @Override
