@@ -27,18 +27,20 @@ public record UpdateQueryClauses(List<Clause> clauses) {
         }
 
         public Builder where(Object entity, MetadataLoader<?> loader) {
-            WhereConditionalClause.builder()
+            WhereConditionalClause whereClause = WhereConditionalClause.builder()
                     .column(loader.getColumnName(loader.getPrimaryKeyField(), nameConverter))
                     .eq(Clause.toColumnValue(Clause.extractValue(loader.getPrimaryKeyField(), entity)));
+
+            clauses.add(whereClause);
+
             return this;
         }
 
-        public Builder setColumnValues(Object entity, MetadataLoader<?> loader) {
-            List<Field> fields = loader.getFieldAllByPredicate(field -> !field.isAnnotationPresent(Id.class));
-
-            for (Field field : fields) {
+        public Builder setColumnValues(Object entity, List<Field> updateFields, MetadataLoader<?> loader) {
+            for (Field field : updateFields) {
                 clauses.add(SetValueClause.newInstance(field, entity, loader.getColumnName(field, nameConverter)));
             }
+
             return this;
         }
 

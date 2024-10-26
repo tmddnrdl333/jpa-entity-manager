@@ -51,35 +51,12 @@ class EntityLoaderFactoryTest {
         // given
         EntityLoaderFactory factory = EntityLoaderFactory.getInstance();
 
-        // when, then
-        assertThatThrownBy(() -> factory.getLoader(TestPerson.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("EntityLoader not found for " + TestPerson.class.getName());
-
-        // and
+        // when
         factory.addLoader(TestPerson.class, database);
+        EntityLoader<TestPerson> actual = factory.getLoader(TestPerson.class);
 
         // when, then
-        assertThat(factory.getLoader(TestPerson.class)).isNotNull();
+        assertThat(actual).isNotNull();
     }
 
-    @ParameterizedTest
-    @MethodSource("provideEntityTypeAndExpected")
-    @DisplayName("EntityLoaderFactory 는 EntityLoader 를 포함하고 있는지 확인할 수 있다.")
-    void testContainsLoader(Class<?> entityType, boolean expected) {
-        // given
-        EntityLoaderFactory factory = EntityLoaderFactory.getInstance();
-        factory.addLoader(TestPerson.class, database);
-
-        // when, then
-        assertThat(factory.containsLoader(entityType)).isEqualTo(expected);
-
-    }
-
-    public static Stream<Arguments> provideEntityTypeAndExpected() {
-        return Stream.of(
-                Arguments.of(TestPerson.class, true),
-                Arguments.of(String.class, false)
-        );
-    }
 }

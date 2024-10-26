@@ -1,14 +1,20 @@
 package persistence.sql.dml;
 
+import persistence.sql.event.FlushEventListener;
+import persistence.sql.transaction.Transaction;
+
 import java.util.List;
 
-public interface EntityManager {
+public interface EntityManager extends FlushEventListener {
+
+    Transaction getTransaction();
+
     /**
      * 엔티티를 저장한다.
      *
      * @param entity 저장할 엔티티
      */
-    <T> T persist(T entity);
+    <T> void persist(T entity);
 
     /**
      * 엔티티를 수정한다.

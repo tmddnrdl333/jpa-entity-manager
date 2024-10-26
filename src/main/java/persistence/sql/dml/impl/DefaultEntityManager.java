@@ -8,23 +8,36 @@ import persistence.sql.context.PersistenceContext;
 import persistence.sql.dml.EntityManager;
 import persistence.sql.dml.MetadataLoader;
 import persistence.sql.loader.EntityLoader;
+import persistence.sql.transaction.Transaction;
+import persistence.sql.transaction.impl.EntityTransaction;
 
 import java.lang.reflect.Field;
+import java.sql.Connection;
 import java.util.List;
 
 public class DefaultEntityManager implements EntityManager {
     private final PersistenceContext persistenceContext;
     private final EntityPersister entityPersister;
     private final EntityLoaderFactory entityLoaderFactory;
+    private Transaction transaction;
+
 
     public DefaultEntityManager(PersistenceContext persistenceContext, EntityPersister entityPersister) {
         this.persistenceContext = persistenceContext;
         this.entityPersister = entityPersister;
         this.entityLoaderFactory = EntityLoaderFactory.getInstance();
+        this.transaction = new EntityTransaction(this);
     }
 
     @Override
-    public <T> T persist(T entity) {
+    public Transaction getTransaction() {
+        Connection connection = entityPersister.getConnection();
+        transaction.connect(connection);
+        return transaction;
+    }
+
+    @Override
+    public <T> void persist(T entity) {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
         }
@@ -35,27 +48,20 @@ public class DefaultEntityManager implements EntityManager {
 
         Object id = entityPersister.insert(entity);
         persistenceContext.add(id, entity);
-
-        return entity;
+        persistenceContext.createDatabaseSnapshot(id, entity);
     }
 
-    private <T> boolean isNew(Object entity) {
-        try {
-            EntityLoader<?> entityLoader = entityLoaderFactory.getLoader(entity.getClass());
-            MetadataLoader<?> loader = entityLoader.getMetadataLoader();
+    private boolean isNew(Object entity) {
+        EntityLoader<?> entityLoader = entityLoaderFactory.getLoader(entity.getClass());
+        MetadataLoader<?> loader = entityLoader.getMetadataLoader();
 
-            Field primaryKeyField = loader.getPrimaryKeyField();
-            primaryKeyField.setAccessible(true);
-            Object idValue = primaryKeyField.get(entity);
-            if (idValue == null) {
-                return true;
-            }
-
-            return find(loader.getEntityType(), idValue) == null;
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-            throw new IllegalStateException(e);
+        Field primaryKeyField = loader.getPrimaryKeyField();
+        Object idValue = Clause.extractValue(primaryKeyField, entity);
+        if (idValue == null) {
+            return true;
         }
+
+        return find(loader.getEntityType(), idValue) == null;
     }
 
     @Override
@@ -63,16 +69,21 @@ public class DefaultEntityManager implements EntityManager {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
         }
-        MetadataLoader<?> loader = new SimpleMetadataLoader<>(entity.getClass());
+        EntityLoader<?> entityLoader = entityLoaderFactory.getLoader(entity.getClass());
+        MetadataLoader<?> loader = entityLoader.getMetadataLoader();
 
         if (isNew(entity)) {
-            return persist(entity);
+            persist(entity);
+            return entity;
         }
 
         Object id = Clause.extractValue(loader.getPrimaryKeyField(), entity);
 
-        entityPersister.update(entity);
-        persistenceContext.merge(id, entity);
+        T databaseSnapshot = persistenceContext.getDatabaseSnapshot(id, entity);
+
+        entityPersister.update(entity, databaseSnapshot);
+        persistenceContext.add(id, entity);
+        persistenceContext.updateSnapshot(id, entity);
 
         return entity;
     }
@@ -82,9 +93,13 @@ public class DefaultEntityManager implements EntityManager {
         if (entity == null) {
             throw new IllegalArgumentException("Entity must not be null");
         }
+        EntityLoader<?> entityLoader = entityLoaderFactory.getLoader(entity.getClass());
+        MetadataLoader<?> loader = entityLoader.getMetadataLoader();
+
+        Object id = Clause.extractValue(loader.getPrimaryKeyField(), entity);
 
         entityPersister.delete(entity);
-        persistenceContext.delete(entity);
+        persistenceContext.delete(entity, id);
     }
 
     @Override
@@ -101,13 +116,30 @@ public class DefaultEntityManager implements EntityManager {
 
         EntityLoader<T> entityLoader = entityLoaderFactory.getLoader(returnType);
 
-        return entityLoader.load(primaryKey);
+        T loadedEntity = entityLoader.load(primaryKey);
+        if (loadedEntity != null) {
+            persistenceContext.add(primaryKey, loadedEntity);
+            persistenceContext.createDatabaseSnapshot(primaryKey, loadedEntity);
+        }
+
+        return loadedEntity;
     }
 
     @Override
     public <T> List<T> findAll(Class<T> entityClass) {
         EntityLoader<T> entityLoader = entityLoaderFactory.getLoader(entityClass);
 
-        return entityLoader.loadAll();
+        List<T> loadedEntities = entityLoader.loadAll();
+        loadedEntities.forEach(entity -> persistenceContext.add(
+                Clause.extractValue(entityLoader.getMetadataLoader().getPrimaryKeyField(), entity), entity));
+        return loadedEntities;
+    }
+
+    @Override
+    public void onFlush() {
+        if (persistenceContext.isDirty()) {
+            persistenceContext.getDirtyEntities().forEach(this::merge);
+        }
+        persistenceContext.cleanup();
     }
 }

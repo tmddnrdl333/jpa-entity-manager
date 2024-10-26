@@ -4,13 +4,15 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import persistence.sql.context.PersistenceContext;
 import persistence.sql.context.impl.DefaultPersistenceContext;
+import persistence.sql.dml.TestEntityInitialize;
 import persistence.sql.fixture.TestPerson;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
 
 @DisplayName("DefaultPersistenceContext 테스트")
-class DefaultPersistenceContextTest {
+class DefaultPersistenceContextTest extends TestEntityInitialize {
     private final PersistenceContext context = new DefaultPersistenceContext();
 
 
@@ -40,59 +42,80 @@ class DefaultPersistenceContextTest {
     }
 
     @Test
-    @DisplayName("merge 함수는 기존에 저장된 엔티티가 없을 경우 새로 저장한다.")
-    void testMergeWithNewEntity() {
+    @DisplayName("isDirty 함수는 변경이 필요한 엔티티가 있을 경우 true를 반환한다.")
+    void testIsDirtyWithDirtyEntity() {
         // given
-        TestPerson entity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
+        TestPerson catsbiEnity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
+        TestPerson crongEntity = new TestPerson(2L, "crong", 7, "crong@naver.com", 123);
+        context.add(catsbiEnity.getId(), catsbiEnity);
+        context.createDatabaseSnapshot(catsbiEnity.getId(), catsbiEnity);
+        context.add(crongEntity.getId(), crongEntity);
+        context.createDatabaseSnapshot(crongEntity.getId(), crongEntity);
 
-        // when
-        context.merge(entity.getId(), entity);
+        //when
+        catsbiEnity.setName("newCatsbi");
 
-        // then
-        TestPerson actual = context.get(TestPerson.class, entity.getId());
-        assertAll(
-                () -> assertThat(actual).isNotNull(),
-                () -> assertThat(actual).isEqualTo(entity)
-        );
+        //then
+        assertThat(context.isDirty()).isTrue();
     }
 
     @Test
-    @DisplayName("merge 함수는 기존에 저장된 엔티티가 있을 경우 엔티티를 덮어쓴다.")
-    void testMergeWithExistedEntity() {
+    @DisplayName("isDirty 함수는 변경이 필요한 엔티티가 없을 경우 true를 반환한다.")
+    void testIsDirtyWithoutDirtyEntity() {
         // given
-        TestPerson entity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
-        context.add(entity.getId(), entity);
+        TestPerson catsbiEnity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
+        context.add(catsbiEnity.getId(), catsbiEnity);
+        context.createDatabaseSnapshot(catsbiEnity.getId(), catsbiEnity);
 
-        // when
-        TestPerson newEntity = new TestPerson(1L, "catsbi2", 34, "catsbi2@naver.com", 123);
-        context.merge(newEntity.getId(), newEntity);
-
-        // then
-        TestPerson actual = context.get(TestPerson.class, entity.getId());
-        assertAll(
-                () -> assertThat(actual).isNotNull(),
-                () -> assertThat(actual.getName()).isEqualTo(newEntity.getName()),
-                () -> assertThat(actual.getAge()).isEqualTo(newEntity.getAge()),
-                () -> assertThat(actual.getEmail()).isEqualTo(newEntity.getEmail())
-        );
+        //then
+        assertThat(context.isDirty()).isFalse();
     }
 
     @Test
-    @DisplayName("merge 함수는 기존에 저장된 엔티티가 존재하고 변경된 내용이 없을 경우 그대로 반환한다.")
-    void testMergeWithNotChangedEntity() {
+    @DisplayName("isDirty 함수는 영속화 대상이지만 스냅샷이 없을 경우도 true를 반환한다.")
+    void testIsDirtyWithoutSnapshot() {
         // given
-        TestPerson entity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
-        context.add(entity.getId(), entity);
+        TestPerson catsbiEnity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
+        context.add(catsbiEnity.getId(), catsbiEnity);
+
+        //then
+        assertThat(context.isDirty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("getDirtyEntities 함수는 변경이 필요한 엔티티 목록을 반환한다.")
+    void testGetDirtyEntities() {
+        // given
+        TestPerson catsbiEnity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
+        TestPerson crongEntity = new TestPerson(2L, "crong", 7, "crong@naver.com", 123);
+        context.add(catsbiEnity.getId(), catsbiEnity);
+        context.createDatabaseSnapshot(catsbiEnity.getId(), catsbiEnity);
+        context.add(crongEntity.getId(), crongEntity);
+        context.createDatabaseSnapshot(crongEntity.getId(), crongEntity);
+
+        //when
+        catsbiEnity.setName("newCatsbi");
+        List<Object> actual = context.getDirtyEntities();
+
+        //then
+        assertThat(actual).containsExactly(catsbiEnity);
+    }
+
+    @Test
+    @DisplayName("getDirtyEntities 함수는 변경이 필요한 엔티티가 없을 경우 빈 목록을 반환한다.")
+    void testGetDirtyEntitiesWithoutDirtyEntity() {
+        // given
+        TestPerson catsbiEnity = new TestPerson(1L, "catsbi", 33, "catsbi@naver.com", 123);
+        TestPerson crongEntity = new TestPerson(2L, "crong", 7, "crong@naver.com", 123);
+        context.add(catsbiEnity.getId(), catsbiEnity);
+        context.createDatabaseSnapshot(catsbiEnity.getId(), catsbiEnity);
+        context.add(crongEntity.getId(), crongEntity);
+        context.createDatabaseSnapshot(crongEntity.getId(), crongEntity);
 
         // when
-        context.merge(entity.getId(), entity);
+        List<Object> actual = context.getDirtyEntities();
 
         // then
-        TestPerson actual = context.get(TestPerson.class, entity.getId());
-
-        assertAll(
-                () -> assertThat(actual).isNotNull(),
-                () -> assertThat(actual).isEqualTo(entity)
-        );
+        assertThat(actual).isEmpty();
     }
 }
