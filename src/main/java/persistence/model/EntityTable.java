@@ -7,7 +7,6 @@ import java.util.List;
 
 public class EntityTable {
     private final String name;
-
     private final EntityTableColumns tableColumns = new EntityTableColumns();
 
     private EntityTable(String name) {
@@ -15,13 +14,15 @@ public class EntityTable {
     }
 
     public static EntityTable build(Class<?> entityClass) {
-        return new EntityTable(getName(entityClass));
+        String tableName = getTableName(entityClass);
+
+        return new EntityTable(tableName);
     }
 
-    private static String getName(Class<?> entityClass) {
-        return ReflectionUtil.getAnnotationIfPresent(entityClass, Table.class)
+    public static String getTableName(Class<?> clazz) {
+        return ReflectionUtil.getAnnotationIfPresent(clazz, Table.class)
                 .map(Table::name)
-                .orElse(entityClass.getSimpleName());
+                .orElse(clazz.getSimpleName());
     }
 
     public String getName() {
