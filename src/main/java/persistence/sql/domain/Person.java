@@ -8,6 +8,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 
+import java.util.Objects;
+
 @Table(name = "users")
 @Entity
 public class Person {
@@ -64,4 +66,5 @@ public class Person {
     public Integer getIndex() {
         return index;
     }
+
 }

@@ -15,7 +15,8 @@ public class EntityManagerImpl implements EntityManager {
 
     @Override
     public <T> T find(Class<T> clazz, Long id) {
-        if (persistenceContext.containsEntity(clazz, id)) {
+        EntityKey entityKey = new EntityKey(id, clazz);
+        if (persistenceContext.containsEntity(entityKey)) {
             return persistenceContext.getEntity(clazz, id);
         }
         return entityLoader.loadEntity(clazz, id);
@@ -24,14 +25,19 @@ public class EntityManagerImpl implements EntityManager {
     @Override
     public Object persist(Object entity) {
         Long idValue = entityPersister.getIdValue(entity);
+
         if (idValue == null) {
             entityPersister.insert(entity);
             idValue = entityPersister.getIdValue(entity);
+            entityPersister.setIdValue(entity, idValue);
+
+            persistenceContext.addEntity(entity, idValue);
         }
-        if (idValue != null) {
+
+        if (idValue != null && persistenceContext.isDirty(idValue, entity)) {
             entityPersister.update(entity);
+            persistenceContext.addSnapshot(idValue, entity);
         }
-        persistenceContext.addEntity(entity, idValue);
         return entity;
     }
 
@@ -50,8 +56,12 @@ public class EntityManagerImpl implements EntityManager {
     @Override
     public Object update(Object entity) {
         Long idValue = entityPersister.getIdValue(entity);
-        entityPersister.update(entity);
-        persistenceContext.addEntity(entity.getClass(), idValue);
+        if (persistenceContext.isDirty(idValue, entity)) {
+            entityPersister.update(entity);
+            persistenceContext.addEntity(entity.getClass(), idValue);
+            persistenceContext.addSnapshot(idValue, entity);
+        }
+
         return entity;
     }
 
