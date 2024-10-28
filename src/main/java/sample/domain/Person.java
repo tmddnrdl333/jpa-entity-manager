@@ -1,4 +1,4 @@
-package persistence.entity;
+package sample.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -48,6 +48,10 @@ public class Person {
         this.age = age;
         this.email = email;
         this.index = index;
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public String getName() {
