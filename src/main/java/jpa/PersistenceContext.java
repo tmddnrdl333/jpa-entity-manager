@@ -1,13 +1,24 @@
 package jpa;
 
+import java.util.List;
+
 public interface PersistenceContext {
 
-    void add(EntityInfo<?> entityInfo, Object entity);
+    void add(Object entity);
 
-    Object get(EntityInfo<?> entityInfo);
+    <T> T get(Class<T> clazz, Long id);
 
-    void remove(EntityInfo<?> entityInfo);
+    void remove(Object entity);
 
-    boolean contain(EntityInfo<?> entityInfo);
+    void update(Object entity);
 
+    <T> T getDatabaseSnapshot(T entity);
+
+    void createDatabaseSnapshot(Object entity);
+
+    void removeDatabaseSnapshot(Object entity);
+
+    boolean isDirty(Object entity);
+
+    List<Object> getDirtyEntities();
 }

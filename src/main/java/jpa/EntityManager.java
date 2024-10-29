@@ -4,10 +4,12 @@ public interface EntityManager {
 
     <T> T find(Class<T> clazz, Long id);
 
-    void persist(Object entity);
+    <T> T persist(T entity);
 
-    void remove(Object Entity);
+    void remove(Object entity);
 
-    void update(Object Entity);
+    void merge(Object entity);
+
+    void flush();
 
 }

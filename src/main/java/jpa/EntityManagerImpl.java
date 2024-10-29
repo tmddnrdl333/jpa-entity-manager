@@ -1,7 +1,5 @@
 package jpa;
 
-import persistence.sql.model.EntityId;
-
 public class EntityManagerImpl implements EntityManager {
     private final EntityPersister entityPersister;
     private final PersistenceContext persistenceContext;
@@ -15,44 +13,46 @@ public class EntityManagerImpl implements EntityManager {
 
     @Override
     public <T> T find(Class<T> clazz, Long id) {
-        EntityInfo<?> entityInfo = new EntityInfo<>(clazz, id);
-        if (persistenceContext.contain(entityInfo)) {
-            return clazz.cast(persistenceContext.get(entityInfo));
+        T entityPersistenceContext = persistenceContext.get(clazz, id);
+        if (entityPersistenceContext != null) {
+            return entityPersistenceContext;
         }
 
         T entity = entityLoader.find(clazz, id);
-        persistenceContext.add(new EntityInfo<>(entity.getClass(), id), entity);
+        persistenceContext.add(entity);
+        persistenceContext.createDatabaseSnapshot(entity);
         return entity;
     }
 
     @Override
-    public void persist(Object entity) {
-        entityPersister.insert(entity);
-        addPersistenceContext(entity);
+    public <T> T persist(T entity) {
+        T insertedEntity = entityPersister.insert(entity);
+        persistenceContext.add(entity);
+        persistenceContext.createDatabaseSnapshot(entity);
+        return insertedEntity;
     }
 
     @Override
-    public void update(Object entity) {
-        entityPersister.update(entity);
-        addPersistenceContext(entity);
+    public void merge(Object entity) {
+        if (persistenceContext.isDirty(entity)) {
+            persistenceContext.add(entity);
+        }
     }
 
-    private void addPersistenceContext(Object entity) {
-        EntityId entityId = new EntityId(entity.getClass());
-        String idValue = entityId.getIdValue(entity);
-        persistenceContext.add(new EntityInfo<>(entity.getClass(), idValue), entity);
+    @Override
+    public void flush() {
+        for (Object entity : persistenceContext.getDirtyEntities()) {
+            entityPersister.update(entity);
+        }
     }
+
 
     @Override
     public void remove(Object entity) {
         entityPersister.delete(entity);
-        removePersistenceContext(entity);
+        persistenceContext.remove(entity);
+        persistenceContext.removeDatabaseSnapshot(entity);
     }
 
-    private void removePersistenceContext(Object entity) {
-        EntityId entityId = new EntityId(entity.getClass());
-        String idValue = entityId.getIdValue(entity);
-        persistenceContext.remove(new EntityInfo<>(entity.getClass(), idValue));
-    }
 
 }
