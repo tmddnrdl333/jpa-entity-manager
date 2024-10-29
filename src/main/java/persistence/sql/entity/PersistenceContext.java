@@ -14,4 +14,8 @@ public interface PersistenceContext {
     void addSnapshot(Long id, Object entity);
 
     boolean isDirty(Long id, Object currentEntity);
+
+    void addEntry(Object entity, EntityEntry entityEntry);
+
+    void removePersistenceContext(EntityKey entityKey, Object entity);
 }
