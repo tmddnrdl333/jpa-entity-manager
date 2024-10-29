@@ -7,6 +7,8 @@ import persistence.sql.context.EntityPersister;
 import persistence.sql.context.PersistenceContext;
 import persistence.sql.dml.EntityManager;
 import persistence.sql.dml.MetadataLoader;
+import persistence.sql.entity.EntityEntry;
+import persistence.sql.entity.data.Status;
 import persistence.sql.loader.EntityLoader;
 import persistence.sql.transaction.Transaction;
 import persistence.sql.transaction.impl.EntityTransaction;
@@ -45,10 +47,11 @@ public class DefaultEntityManager implements EntityManager {
         if (!isNew(entity)) {
             throw new EntityExistsException("Entity already exists");
         }
-
-        Object id = entityPersister.insert(entity);
-        persistenceContext.add(id, entity);
-        persistenceContext.createDatabaseSnapshot(id, entity);
+        entityPersister.insert(entity);
+        EntityEntry entityEntry = persistenceContext.addEntry(entity, Status.SAVING, entityPersister);
+        if (!transaction.isActive()) {
+            entityEntry.updateStatus(Status.MANAGED);
+        }
     }
 
     private boolean isNew(Object entity) {
@@ -79,11 +82,16 @@ public class DefaultEntityManager implements EntityManager {
 
         Object id = Clause.extractValue(loader.getPrimaryKeyField(), entity);
 
-        T databaseSnapshot = persistenceContext.getDatabaseSnapshot(id, entity);
+        EntityEntry entry = persistenceContext.getEntry(entity.getClass(), id);
+        if (entry == null) {
+            throw new IllegalStateException("Entity not found. ");
+        }
 
-        entityPersister.update(entity, databaseSnapshot);
-        persistenceContext.add(id, entity);
-        persistenceContext.updateSnapshot(id, entity);
+        entry.updateEntity(entity);
+        if (!transaction.isActive()) {
+            entityPersister.update(entity, entry.getSnapshot());
+            entry.synchronizingSnapshot();
+        }
 
         return entity;
     }
@@ -98,8 +106,16 @@ public class DefaultEntityManager implements EntityManager {
 
         Object id = Clause.extractValue(loader.getPrimaryKeyField(), entity);
 
-        entityPersister.delete(entity);
-        persistenceContext.delete(entity, id);
+        EntityEntry entityEntry = persistenceContext.getEntry(entity.getClass(), id);
+        if (entityEntry == null) {
+            throw new IllegalStateException("Entity not found. ");
+        }
+
+        entityEntry.updateStatus(Status.DELETED);
+        if (!transaction.isActive()) {
+            entityPersister.delete(entity);
+            persistenceContext.deleteEntry(entity, id);
+        }
     }
 
     @Override
@@ -108,18 +124,19 @@ public class DefaultEntityManager implements EntityManager {
             throw new IllegalArgumentException("Primary key must not be null");
         }
 
-        T foundEntity = persistenceContext.get(returnType, primaryKey);
+        EntityEntry entry = persistenceContext.getEntry(returnType, primaryKey);
 
-        if (foundEntity != null) {
-            return foundEntity;
+        if (entry != null) {
+            return returnType.cast(entry.getEntity());
         }
 
+        entry = persistenceContext.addLoadingEntry(primaryKey, returnType);
         EntityLoader<T> entityLoader = entityLoaderFactory.getLoader(returnType);
 
         T loadedEntity = entityLoader.load(primaryKey);
         if (loadedEntity != null) {
-            persistenceContext.add(primaryKey, loadedEntity);
-            persistenceContext.createDatabaseSnapshot(primaryKey, loadedEntity);
+            entry.updateEntity(loadedEntity);
+            entry.updateStatus(Status.MANAGED);
         }
 
         return loadedEntity;
@@ -130,16 +147,16 @@ public class DefaultEntityManager implements EntityManager {
         EntityLoader<T> entityLoader = entityLoaderFactory.getLoader(entityClass);
 
         List<T> loadedEntities = entityLoader.loadAll();
-        loadedEntities.forEach(entity -> persistenceContext.add(
-                Clause.extractValue(entityLoader.getMetadataLoader().getPrimaryKeyField(), entity), entity));
+        for (T loadedEntity : loadedEntities) {
+            persistenceContext.addEntry(loadedEntity, Status.MANAGED, entityPersister);
+        }
+
         return loadedEntities;
     }
 
     @Override
     public void onFlush() {
-        if (persistenceContext.isDirty()) {
-            persistenceContext.getDirtyEntities().forEach(this::merge);
-        }
+        persistenceContext.dirtyCheck(entityPersister);
         persistenceContext.cleanup();
     }
 }
