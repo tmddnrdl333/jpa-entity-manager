@@ -10,7 +10,7 @@ import test_entity.PersonWithAI;
 import static org.assertj.core.api.Assertions.assertThat;
 import static steps.Steps.테이블_생성;
 
-public class SessionImplTest extends PluggableH2test {
+class SessionImplTest extends PluggableH2test {
 
     @Test
     @DisplayName("insert 후 find 메서드를 사용하면 엔티티 Object의 Equality와 Identity 모두 유지된다.")
@@ -103,10 +103,9 @@ public class SessionImplTest extends PluggableH2test {
         });
     }
 
-    // TODO: 추후 Hibernate의 더티체킹과 상태를 구현하면 persistence() 메서드 하나로 insert와 update를 구분 할 수 있어야한다. (EntityEntry)
     @Test
-    @DisplayName("merge 엔티티를 조회한 후")
-    void merge_테스트() {
+    @DisplayName("엔티티 수정, merge 이후 엔티티를 재조회하면 수정 전, merge 후, 재조회한 객체의 identity가 모두 같아야 한다.")
+    void merge_후_재조회_테스트() {
         runInH2Db(queryRunner -> {
             // given
             테이블_생성(queryRunner, Person.class);
@@ -114,18 +113,35 @@ public class SessionImplTest extends PluggableH2test {
             session.persist(new Person(1L, 30, "설동민"));
 
             Person person = session.find(Person.class, 1L);
+            person.setName("설동민 - 수정함");
+            person.setAge(20);
 
             // when
-            person.setName("설동민 - 수정함");
-            session.merge(person);
-            Person result = session.find(Person.class, 1L);
+            Person mergedPerson = session.merge(person);
+            Person foundPerson = session.find(Person.class, 1L);
 
             // then
-            assertThat(result).satisfies(p -> {
-                assertThat(p.getId()).isEqualTo(1L);
-                assertThat(p.getAge()).isEqualTo(30);
-                assertThat(p.getName()).isEqualTo("설동민 - 수정함");
-            });
+            assertThat(mergedPerson)
+                    .isSameAs(person) // merge 되기 전의 엔티티와 identity가 같아야 한다.
+                    .isSameAs(foundPerson); // merge 후 다시 조회한 엔티티와도 identity가 같아야 한다.
+        });
+    }
+
+    @Test
+    @DisplayName("신규 엔티티를 merge 하면 insert 되어 PK가 존재해야한다.")
+    void 신규_엔티티_merge() {
+        runInH2Db(queryRunner -> {
+            // given
+            테이블_생성(queryRunner, PersonWithAI.class);
+            SessionImpl session = new SessionImpl(queryRunner);
+
+            PersonWithAI personWithAI = new PersonWithAI(30L, "설동민");
+
+            // when
+            session.merge(personWithAI);
+
+            // then
+            assertThat(personWithAI.getId()).isNotNull();
         });
     }
 }

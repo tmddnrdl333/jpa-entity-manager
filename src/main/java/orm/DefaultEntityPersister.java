@@ -1,7 +1,9 @@
 package orm;
 
+import orm.dirty_check.DirtyCheckMarker;
 import orm.dsl.QueryBuilder;
 import orm.dsl.QueryRunner;
+import orm.dsl.holder.EntityIdHolder;
 
 public class DefaultEntityPersister implements EntityPersister {
 
@@ -20,13 +22,29 @@ public class DefaultEntityPersister implements EntityPersister {
     }
 
     @Override
-    public <T> T update(T entity) {
-        queryBuilder.update(entity, queryRunner).byId().execute();
+    public <T> T update(T entity, T oldVersion) {
+        var objectTableEntity = new TableEntity<>(entity);
+        var oldVersionTableEntity = new TableEntity<>(oldVersion);
+
+        boolean hasDirty = new DirtyCheckMarker<>(objectTableEntity, oldVersionTableEntity).compareAndMarkChangedField();
+        if (hasDirty) {
+            queryBuilder.update(objectTableEntity, queryRunner)
+                    .byId()
+                    .execute();
+        }
+
         return entity;
     }
 
     @Override
     public void remove(Object entity) {
         queryBuilder.deleteFrom(entity, queryRunner).byId().execute();
+    }
+
+    @Override
+    public <T> T getDatabaseSnapshot(EntityIdHolder<T> idHolder) {
+        return queryBuilder.selectFrom(idHolder.getEntityClass(), queryRunner)
+                .findById(idHolder.getIdValue())
+                .fetchOne();
     }
 }

@@ -15,7 +15,7 @@ import static orm.dsl.DSL.eq;
 import static steps.Steps.Person_엔티티_생성;
 import static steps.Steps.테이블_생성;
 
-public class QueryBuilderDeleteTest extends PluggableH2test {
+class QueryBuilderDeleteTest extends PluggableH2test {
 
     QueryBuilder queryBuilder;
     QueryRunner fakeQueryRunner;
@@ -38,7 +38,7 @@ public class QueryBuilderDeleteTest extends PluggableH2test {
     }
 
     @Test
-    @DisplayName("DELETE 절 조건 포함 실행 테스트")
+    @DisplayName("DELETE 절 조건 포함 쿼리생성 테스트")
     void DML_DELETE_문_조건절_테스트() {
         // given
         // when
@@ -55,7 +55,7 @@ public class QueryBuilderDeleteTest extends PluggableH2test {
     }
 
     @Test
-    @DisplayName("DELETE 절 조건 실제 실행 테스트")
+    @DisplayName("DELETE 절 조건 실행 테스트")
     void DML_DELETE_문_실행_테스트() {
         runInH2Db((queryRunner) -> {
             // given
