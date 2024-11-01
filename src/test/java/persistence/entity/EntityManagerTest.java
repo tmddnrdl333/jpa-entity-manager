@@ -3,14 +3,18 @@ package persistence.entity;
 import database.DatabaseServer;
 import database.H2;
 import jakarta.persistence.EntityExistsException;
+import jakarta.persistence.Id;
 import jdbc.JdbcTemplate;
 import org.junit.jupiter.api.*;
+import persistence.model.EntityPrimaryKey;
 import persistence.model.exception.ColumnInvalidException;
 import persistence.sql.ddl.DdlQueryBuilder;
 import persistence.sql.dialect.Dialect;
-import persistence.sql.dialect.DialectFactory;
+import persistence.sql.dialect.H2Dialect;
+import persistence.sql.dialect.type.H2DataTypeRegistry;
 import persistence.sql.dml.DmlQueryBuilder;
 import persistence.fixture.PersonWithTransientAnnotation;
+import persistence.util.ReflectionUtil;
 
 import java.sql.SQLException;
 import java.util.AbstractMap;
@@ -21,31 +25,26 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class EntityManagerTest {
-    DatabaseServer databaseServer;
-
-    Dialect dialect;
-
-    DmlQueryBuilder dmlQueryBuilder;
-
-    DdlQueryBuilder ddlQueryBuilder;
-
-    JdbcTemplate jdbcTemplate;
-
-    EntityPersister entityPersister;
-
-    EntityManager entityManager;
+    private static DatabaseServer databaseServer;
+    private static JdbcTemplate jdbcTemplate;
+    private static final Dialect dialect = new H2Dialect(new H2DataTypeRegistry());
+    private static final DmlQueryBuilder dmlQueryBuilder = new DmlQueryBuilder(dialect);
+    private static final DdlQueryBuilder ddlQueryBuilder = new DdlQueryBuilder(dialect);
+    private static PersistenceContext persistenceContext;
+    private static EntityPersister entityPersister;
+    private static EntityLoader entityLoader;
+    private static EntityManager entityManager;
 
     @BeforeEach
     void setup() throws SQLException {
         databaseServer = new H2();
-        dialect = DialectFactory.create(databaseServer.getClass());
-        dmlQueryBuilder = new DmlQueryBuilder(dialect);
-        ddlQueryBuilder = new DdlQueryBuilder(dialect);
-        PersistenceContext persistenceContext = new PersistenceContextImpl();
         jdbcTemplate = new JdbcTemplate(databaseServer.getConnection());
-        entityPersister = new EntityPersisterImpl(jdbcTemplate, dmlQueryBuilder);
 
-        entityManager = new EntityManagerImpl(entityPersister, dmlQueryBuilder, jdbcTemplate, persistenceContext);
+        persistenceContext = new PersistenceContextImpl();
+        entityPersister = new EntityPersisterImpl(jdbcTemplate, dmlQueryBuilder);
+        entityLoader = new EntityLoaderImpl(jdbcTemplate, dmlQueryBuilder);
+
+        entityManager = new EntityManagerImpl(entityPersister, entityLoader, persistenceContext);
 
         jdbcTemplate.execute(ddlQueryBuilder.buildCreateTableQuery(PersonWithTransientAnnotation.class));
     }
@@ -83,11 +82,9 @@ public class EntityManagerTest {
         }
 
         @Test
-        @DisplayName("해당하는 엔티티가 없다면 에러를 내뱉는다.")
+        @DisplayName("해당하는 엔티티가 없다면 null을 반환한다.")
         void failToFindById() {
-            assertThrows(IllegalArgumentException.class, () -> {
-                entityManager.find(PersonWithTransientAnnotation.class, 1L);
-            });
+            assertNull(entityManager.find(PersonWithTransientAnnotation.class, 1L));
         }
     }
 
@@ -101,20 +98,25 @@ public class EntityManagerTest {
             PersonWithTransientAnnotation person = new PersonWithTransientAnnotation(
                     1L, "홍길동", 20, "test@test.com", 1
             );
-            entityManager.persist(person);
 
             // when
-            PersonWithTransientAnnotation foundPerson = entityManager.find(
-                    PersonWithTransientAnnotation.class,
-                    1L
-            );
+            entityManager.persist(person);
 
             // then
-            assertEquals(foundPerson.getName(), person.getName());
+            PersonWithTransientAnnotation contextFound = persistenceContext.getEntity(
+                    PersonWithTransientAnnotation.class, 1L
+            );
+            PersonWithTransientAnnotation databaseFound = entityLoader.find(
+                    PersonWithTransientAnnotation.class, 1L
+            );
+            assertAll(
+                    () -> assertSame(contextFound, person),
+                    () -> assertEquals(databaseFound.getName(), person.getName())
+            );
         }
 
         @Test
-        @DisplayName("이미 존재하는 엔티티라면 에러를 뱉는다.")
+        @DisplayName("영속성 컨텍스트에 이미 존재하는 엔티티라면 에러를 뱉는다.")
         void failToPersistForAlreadyExistingEntity() {
             // given
             PersonWithTransientAnnotation person = new PersonWithTransientAnnotation(
@@ -126,6 +128,38 @@ public class EntityManagerTest {
             assertThrows(EntityExistsException.class, () -> {
                 entityManager.persist(person);
             });
+        }
+
+        @Test
+        @DisplayName("영속성 컨텍스트에 없더라도 데이터베이스에 있다면 에러를 뱉는다.")
+        void failToPersistForAlreadyExistingDatabase() {
+            // given
+            PersonWithTransientAnnotation person = new PersonWithTransientAnnotation(
+                    1L, "홍길동", 20, "test@test.com", 1
+            );
+            entityPersister.insert(person);
+
+            // when, then
+            assertThrows(EntityExistsException.class, () -> {
+                entityManager.persist(person);
+            });
+        }
+
+        @Test
+        @DisplayName("Id가 없는 엔티티는, 데이터베이스에 생성 후 생성된 Id를 영속성 컨텍스트에 저장한다.")
+        void succeedToPersistEntityWithoutId() {
+            // given
+            PersonWithTransientAnnotation person = new PersonWithTransientAnnotation("test@test.com");
+
+            // when
+            entityManager.persist(person);
+
+            // then
+            EntityPrimaryKey pk = EntityPrimaryKey.build(person);
+            Object foundEntity = persistenceContext.getEntity(PersonWithTransientAnnotation.class, pk.keyValue());
+            Object foundEntityId = ReflectionUtil.getFieldNameAndValue(foundEntity, Id.class).getValue();
+
+            assertEquals(1L, foundEntityId);
         }
     }
 
@@ -145,9 +179,18 @@ public class EntityManagerTest {
             entityManager.remove(person);
 
             // then
-            assertThrows(RuntimeException.class, () -> {
-                entityManager.find(PersonWithTransientAnnotation.class, 1L);
-            });
+            PersonWithTransientAnnotation contextFound = persistenceContext.getEntity(
+                    PersonWithTransientAnnotation.class, 1L
+            );
+            boolean isFoundInDatabase = entityLoader.exists(
+                    PersonWithTransientAnnotation.class, 1L
+            );
+
+            assertAll(
+                    () -> assertNull(contextFound),
+                    () -> assertFalse(isFoundInDatabase)
+            );
+
         }
 
         @Test
@@ -180,20 +223,39 @@ public class EntityManagerTest {
             entityManager.merge(person);
 
             // then
-            PersonWithTransientAnnotation foundPerson = entityManager.find(PersonWithTransientAnnotation.class, 1L);
-            assertEquals(30, foundPerson.getAge());
+            PersonWithTransientAnnotation contextFound = persistenceContext.getEntity(
+                    PersonWithTransientAnnotation.class, 1L
+            );
+            PersonWithTransientAnnotation databaseFound = entityLoader.find(
+                    PersonWithTransientAnnotation.class, 1L
+            );
+
+            assertAll(
+                    () -> assertEquals(30, contextFound.getAge()),
+                    () -> assertEquals(30, databaseFound.getAge())
+            );
         }
 
         @Test
         @DisplayName("저장된 엔티티가 아니라면 새로 저장한다.")
         void succeedToAddNew() {
-            PersonWithTransientAnnotation person = new PersonWithTransientAnnotation(
+            PersonWithTransientAnnotation entity = new PersonWithTransientAnnotation(
                     1L, "홍길동", 20, "test@test.com", 1
             );
 
-            entityManager.merge(person);
+            PersonWithTransientAnnotation mergeResult = entityManager.merge(entity);
+            PersonWithTransientAnnotation contextFound = persistenceContext.getEntity(
+                    PersonWithTransientAnnotation.class, 1L
+            );
+            PersonWithTransientAnnotation databaseFound = entityLoader.find(
+                    PersonWithTransientAnnotation.class, 1L
+            );
 
-            assertNotNull(entityManager.find(PersonWithTransientAnnotation.class, 1L));
+            assertAll(
+                    () -> assertSame(contextFound, mergeResult),
+                    () -> assertEquals(databaseFound.getId(), mergeResult.getId())
+            );
+
         }
     }
 }

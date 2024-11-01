@@ -26,6 +26,14 @@ public class PersistenceContextImpl implements PersistenceContext {
         entityCache.remove(cacheKey);
     }
 
+    @Override
+    public boolean isEntityExists(Object entityObject) {
+        Class<?> entityClass = entityObject.getClass();
+        Object entityId = EntityPrimaryKey.build(entityObject).keyValue();
+        final EntityKey entityKey = createEntityKey(entityClass, entityId);
+        return entityCache.containsKey(entityKey);
+    }
+
     private EntityKey createEntityKey(Class<?> entityClass, Object id) {
         EntityPrimaryKey primaryKey = EntityPrimaryKey.build(entityClass, id);
         return new EntityKey(entityClass, primaryKey);

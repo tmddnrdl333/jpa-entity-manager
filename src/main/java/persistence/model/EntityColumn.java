@@ -5,14 +5,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import persistence.model.meta.Value;
-import persistence.model.util.ReflectionUtil;
 
 import java.lang.reflect.Field;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Optional;
 
-import static persistence.model.util.ReflectionUtil.getAnnotationIfPresent;
+import static persistence.util.ReflectionUtil.getAnnotationIfPresent;
 
 public class EntityColumn {
     private final String name;
@@ -112,6 +111,10 @@ public class EntityColumn {
 
     public Object getValue() {
         return value.orElseThrow().getValue();
+    }
+
+    public void setValue(Object value) {
+        this.value = Optional.of(new Value(value));
     }
 
     public Boolean isValueNotNull() {

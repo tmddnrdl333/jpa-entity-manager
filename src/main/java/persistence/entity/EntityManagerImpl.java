@@ -1,28 +1,21 @@
 package persistence.entity;
 
 import jakarta.persistence.EntityExistsException;
-import jdbc.JdbcTemplate;
-import jdbc.RowMapperImpl;
 import persistence.model.EntityPrimaryKey;
-import persistence.sql.dml.DmlQueryBuilder;
+import persistence.util.ReflectionUtil;
 
 public class EntityManagerImpl implements EntityManager {
     private final EntityPersister entityPersister;
-
-    // XXX: loader가 생기면 DmlQueryBuilder와 JdbcTemplate도 제거?
-    private final DmlQueryBuilder queryBuilder;
-    private final JdbcTemplate jdbcTemplate;
+    private final EntityLoader entityLoader;
     private final PersistenceContext persistenceContext;
 
     public EntityManagerImpl(
             EntityPersister entityPersister,
-            DmlQueryBuilder queryBuilder,
-            JdbcTemplate jdbcTemplate,
+            EntityLoader entityLoader,
             PersistenceContext persistenceContext
     ) {
         this.entityPersister = entityPersister;
-        this.queryBuilder = queryBuilder;
-        this.jdbcTemplate = jdbcTemplate;
+        this.entityLoader = entityLoader;
         this.persistenceContext = persistenceContext;
     }
 
@@ -32,21 +25,27 @@ public class EntityManagerImpl implements EntityManager {
         if (entity != null) {
             return entity;
         }
-
-        String selectQuery = queryBuilder.buildSelectByIdQuery(clazz, id);
         try {
-            return jdbcTemplate.queryForObject(selectQuery, resultSet -> new RowMapperImpl<>(clazz).mapRow(resultSet));
+            T foundEntity = entityLoader.find(clazz, id);
+            persistenceContext.addEntity(foundEntity);
+            return foundEntity;
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("ENTITY NOT FOUND. id = " + id);
+            return null;
         }
     }
 
     @Override
     public void persist(Object entity) {
-        if (isEntityExists(entity)) {
+        EntityPrimaryKey pk = EntityPrimaryKey.build(entity);
+
+        boolean existsInContext = persistenceContext.isEntityExists(entity);
+        boolean existsInDatabase = pk.isValid() && entityLoader.exists(entity.getClass(), pk.keyValue());
+
+        if (existsInContext || existsInDatabase) {
             throw new EntityExistsException("ENTITY ALREADY EXISTS!");
         }
-        entityPersister.insert(entity);
+        Object generatedId = entityPersister.insert(entity);
+        ReflectionUtil.setFieldValue(entity, pk.keyName(), generatedId);
         persistenceContext.addEntity(entity);
     }
 
@@ -57,19 +56,12 @@ public class EntityManagerImpl implements EntityManager {
     }
 
     @Override
-    public void merge(Object entity) {
-        if (isEntityExists(entity)) {
+    public <T> T merge(T entity) {
+        if (persistenceContext.isEntityExists(entity)) {
             entityPersister.update(entity);
-        } else {
-            persist(entity);
+            return entity;
         }
-    }
-
-    private Boolean isEntityExists(Object entity) {
-        Class<?> entityClass = entity.getClass();
-        Object entityId = EntityPrimaryKey.build(entity).keyValue();
-        Object existingEntity = persistenceContext.getEntity(entityClass, entityId);
-
-        return existingEntity != null;
+        persist(entity);
+        return entity;
     }
 }

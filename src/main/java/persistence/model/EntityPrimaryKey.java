@@ -2,7 +2,7 @@ package persistence.model;
 
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import persistence.model.util.ReflectionUtil;
+import persistence.util.ReflectionUtil;
 
 import java.util.Map;
 
@@ -21,5 +21,9 @@ public record EntityPrimaryKey(String keyName, Object keyValue, String entityTab
         String entityTableName = ReflectionUtil.getClassName(entityClass, Table.class);
 
         return new EntityPrimaryKey(pkName, pkValue, entityTableName);
+    }
+
+    public boolean isValid() {
+        return keyValue != null;
     }
 }
