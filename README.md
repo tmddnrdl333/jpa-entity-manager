@@ -1,6 +1,6 @@
 # 만들면서 배우는 JPA
 
-## 1. SQL 쿼리 빌더 구현
+## 1. SQL 쿼리 빌더
 
 ### 1-1. Reflection
 
@@ -35,3 +35,15 @@
 - [x] persist 구현
 - [x] remove 구현
 - [x] update 구현
+
+## 2. Entity 구현
+
+### 2-1. EntityPersister 구현
+
+- [ ] PersistenceContext, EntityManager 추상화 설계 및 인터페이스 작성
+- [ ] PersistenceContext 구현
+- [ ] EntityPersister 구현
+  - [ ] 관리할 매핑 정보 작성
+  - [ ] update 구현
+  - [ ] insert 구현
+  - [ ] delete 구현
