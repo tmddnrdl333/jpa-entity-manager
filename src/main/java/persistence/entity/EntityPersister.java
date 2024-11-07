@@ -24,9 +24,9 @@ public class EntityPersister {
         jdbcTemplate.execute(updateQuery);
     }
 
-    public void insert(Object entity) {
+    public Long insert(Object entity) {
         String insertQuery = InsertQueryBuilder.generateQuery(entity);
-        jdbcTemplate.execute(insertQuery);
+        return jdbcTemplate.executeAndReturnGeneratedKey(insertQuery);
     }
 
     public void delete(Object entity) {

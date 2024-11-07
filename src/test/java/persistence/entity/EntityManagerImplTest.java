@@ -43,6 +43,7 @@ public class EntityManagerImplTest {
     @DisplayName("USERS 테이블 생성 > 데이터 저장 > 조회 테스트")
     void persistAndFindAndRemoveTest() {
         EntityManagerImpl entityManagerImpl = new EntityManagerImpl(jdbcTemplate);
+        entityManagerImpl.beginTransaction();
 
         Person inserting = new Person();
         inserting.setName("이름");
@@ -56,12 +57,14 @@ public class EntityManagerImplTest {
         logger.debug("Found : {}", found);
 
         entityManagerImpl.remove(found);
+        entityManagerImpl.commitTransaction();
     }
 
     @Test
     @DisplayName("USERS 테이블 생성 > 데이터 저장 > 조회 테스트")
     void persistAndUpdateTest() {
         EntityManagerImpl entityManagerImpl = new EntityManagerImpl(jdbcTemplate);
+        entityManagerImpl.beginTransaction();
 
         Person inserting = new Person();
         inserting.setName("이름");
@@ -83,5 +86,26 @@ public class EntityManagerImplTest {
         Person reFound = (Person) entityManagerImpl.find(Person.class, 1L);
 
         logger.debug("Re found : {}", reFound);
+        entityManagerImpl.commitTransaction();
+    }
+
+    @Test
+    @DisplayName("generated key 테스트")
+    void generatedKeyTest() {
+        EntityManagerImpl entityManager = new EntityManagerImpl(jdbcTemplate);
+        entityManager.beginTransaction();
+
+        Person person = new Person();
+        person.setName("김이박");
+        person.setAge(17);
+        person.setEmail("email@email.email");
+
+        entityManager.persist(person);
+
+        Object found = entityManager.find(Person.class, 1L);
+
+        logger.debug("Found by generated key : {}", found);
+
+        entityManager.commitTransaction();
     }
 }
