@@ -6,21 +6,19 @@ import java.util.List;
 import java.util.Map;
 
 public class PersistenceContextImpl implements PersistenceContext {
-    private final Map<Class<?>, Map<Long, Object>> originalStorage;
-    private final Map<Class<?>, Map<Long, Object>> updatedStorage;
+    private final Map<Class<?>, Map<Long, Object>> cacheStorage;
     private final Map<Class<?>, List<Object>> insertingStorage;
     private final Map<Class<?>, List<Long>> deletingStorage;
 
     public PersistenceContextImpl() {
-        this.originalStorage = new HashMap<>();
-        this.updatedStorage = new HashMap<>();
+        this.cacheStorage = new HashMap<>();
         this.insertingStorage = new HashMap<>();
         this.deletingStorage = new HashMap<>();
     }
 
     @Override
     public Object get(Class<?> clazz, Long id) {
-        Map<Long, Object> entityMap = originalStorage.get(clazz);
+        Map<Long, Object> entityMap = cacheStorage.get(clazz);
         if (entityMap == null) {
             return null;
         }
@@ -37,18 +35,6 @@ public class PersistenceContextImpl implements PersistenceContext {
         }
     }
 
-    private void putUpdatedStorage(Long idValue, Object entity) {
-        Class<?> clazz = entity.getClass();
-        Map<Long, Object> entityMap;
-        if (updatedStorage.containsKey(clazz)) {
-            entityMap = updatedStorage.get(clazz);
-        } else {
-            entityMap = new HashMap<>();
-            updatedStorage.put(clazz, entityMap);
-        }
-        entityMap.put(idValue, entity);
-    }
-
     private void putInsertingStorage(Object entity) {
         Class<?> clazz = entity.getClass();
         List<Object> entityList;
@@ -59,6 +45,18 @@ public class PersistenceContextImpl implements PersistenceContext {
             insertingStorage.put(clazz, entityList);
         }
         entityList.add(entity);
+    }
+
+    private void putUpdatedStorage(Long idValue, Object entity) {
+        Class<?> clazz = entity.getClass();
+        Map<Long, Object> entityMap;
+        if (cacheStorage.containsKey(clazz)) {
+            entityMap = cacheStorage.get(clazz);
+        } else {
+            entityMap = new HashMap<>();
+            cacheStorage.put(clazz, entityMap);
+        }
+        entityMap.put(idValue, entity);
     }
 
     @Override
