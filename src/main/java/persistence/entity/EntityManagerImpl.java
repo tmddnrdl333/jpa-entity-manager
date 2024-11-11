@@ -4,10 +4,12 @@ import jdbc.JdbcTemplate;
 
 public class EntityManagerImpl implements EntityManager {
     private final EntityPersister entityPersister;
+    private final EntityLoader entityLoader;
     private PersistenceContext persistenceContext;
 
     public EntityManagerImpl(JdbcTemplate jdbcTemplate) {
         this.entityPersister = new EntityPersister(jdbcTemplate);
+        this.entityLoader = new EntityLoader(jdbcTemplate);
     }
 
     public void beginTransaction() {
@@ -31,7 +33,7 @@ public class EntityManagerImpl implements EntityManager {
         }
 
         /* 관리 중이지 않다면 DB 조회 */
-        Object entity = entityPersister.find(clazz, id);
+        Object entity = entityLoader.find(clazz, id);
         persistenceContext.put(entity);
         return entity;
     }
@@ -39,7 +41,7 @@ public class EntityManagerImpl implements EntityManager {
     @Override
     public void persist(Object newEntity) {
         Long generatedKey = entityPersister.insert(newEntity);
-        Object insertedEntity = entityPersister.find(newEntity.getClass(), generatedKey);
+        Object insertedEntity = entityLoader.find(newEntity.getClass(), generatedKey);
         persistenceContext.put(insertedEntity);
     }
 
