@@ -52,8 +52,8 @@ public class PersistenceContextImpl implements PersistenceContext {
     }
 
     @Override
-    public Object getSnapshot(Long id, Object entity) {
+    public EntitySnapshot getSnapshot(Long id, Object entity) {
         Class<?> clazz = entity.getClass();
-        return this.snapshotStorage.get(clazz).get(id);
+        return getOrCreateSnapshotMap(clazz).get(id);
     }
 }

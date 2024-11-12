@@ -31,5 +31,5 @@ public interface PersistenceContext {
      * @param entity 엔티티
      * @return 스냅샷
      */
-    Object getSnapshot(Long id, Object entity);
+    EntitySnapshot getSnapshot(Long id, Object entity);
 }
