@@ -5,6 +5,7 @@ import database.H2;
 import example.entity.Person;
 import jdbc.JdbcTemplate;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -107,5 +108,64 @@ public class EntityManagerImplTest {
         logger.debug("Found by generated key : {}", found);
 
         entityManager.commitTransaction();
+    }
+
+    @Test
+    @DisplayName("트랜잭션 커밋 후 업데이트 쿼리 실행 여부 테스트")
+    void updateInTransactionTest() {
+        EntityManagerImpl entityManagerImpl = new EntityManagerImpl(jdbcTemplate);
+        entityManagerImpl.beginTransaction();
+
+        Person inserting = new Person();
+        inserting.setName("업데이트 대상");
+        inserting.setAge(99);
+        inserting.setEmail("업데이트@대상.이메일");
+
+        logger.debug("(1) insert...");
+        entityManagerImpl.persist(inserting);
+
+        Person inContextPerson = (Person) entityManagerImpl.find(Person.class, 1L);
+        logger.debug("(2) find from persistence context : {}", inContextPerson);
+
+        inContextPerson.setName("업데이트가 됐다");
+        inContextPerson.setAge(999);
+        inContextPerson.setEmail("업데이트가@됐다.이메일");
+
+        logger.debug("(3) update in transaction : {}", inContextPerson);
+
+        logger.debug("(4) transation commit...");
+        entityManagerImpl.commitTransaction();
+
+        EntityLoader entityLoader = new EntityLoader(jdbcTemplate);
+        Object updatedPersonFromDB = entityLoader.find(Person.class, 1L);
+        logger.debug("(5) find from db directly after commit : {}", updatedPersonFromDB);
+    }
+
+    @Test
+    @DisplayName("트랜잭션 커밋 후 삭제 쿼리 실행 여부 테스트")
+    void removeInTransactionTest() {
+        EntityManagerImpl entityManagerImpl = new EntityManagerImpl(jdbcTemplate);
+        entityManagerImpl.beginTransaction();
+
+        Person inserting = new Person();
+        inserting.setName("삭제 대상");
+        inserting.setAge(99);
+        inserting.setEmail("삭제@대상.이메일");
+
+        logger.debug("(1) insert...");
+        entityManagerImpl.persist(inserting);
+
+        Person inContextPerson = (Person) entityManagerImpl.find(Person.class, 1L);
+        logger.debug("(2) find from persistence context : {}", inContextPerson);
+
+        logger.debug("(3) remove from persistence context...");
+        entityManagerImpl.remove(inContextPerson);
+
+        logger.debug("(4) transation commit...");
+        entityManagerImpl.commitTransaction();
+
+        logger.debug("(5) find after transaction commit...");
+        EntityLoader entityLoader = new EntityLoader(jdbcTemplate);
+        Assertions.assertThrows(RuntimeException.class, () -> entityLoader.find(Person.class, 1L));
     }
 }

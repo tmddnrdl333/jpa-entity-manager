@@ -39,6 +39,7 @@ public class EntityUtils {
 
     public static Object getFieldValue(Field field, Object entity) {
         try {
+            field.setAccessible(true);
             return field.get(entity);
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);

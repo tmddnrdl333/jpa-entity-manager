@@ -10,12 +10,10 @@ public class DeleteQueryBuilder {
     private DeleteQueryBuilder() {
     }
 
-    public static String generateQuery(Class<?> entityClass, Object entity) {
+    public static String generateQuery(Class<?> entityClass, Long idValue) {
         String tableName = NameUtils.getTableName(entityClass);
         Field idColumnField = getIdColumnField(entityClass);
         String idColumnName = NameUtils.getColumnName(idColumnField);
-        idColumnField.setAccessible(true);
-        Object idValue = EntityUtils.getFieldValue(idColumnField, entity);
 
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder
