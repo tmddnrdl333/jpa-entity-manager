@@ -1,15 +1,12 @@
 package persistence.sql.dml.delete;
 
 import jakarta.persistence.Id;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import persistence.entity.EntityUtils;
 import persistence.sql.NameUtils;
 
 import java.lang.reflect.Field;
 
 public class DeleteQueryBuilder {
-    private static final Logger logger = LoggerFactory.getLogger(DeleteQueryBuilder.class);
-
     private DeleteQueryBuilder() {
     }
 
@@ -18,13 +15,7 @@ public class DeleteQueryBuilder {
         Field idColumnField = getIdColumnField(entityClass);
         String idColumnName = NameUtils.getColumnName(idColumnField);
         idColumnField.setAccessible(true);
-        Object idValue;
-        try {
-            idValue = idColumnField.get(entity);
-        } catch (IllegalAccessException e) {
-            logger.error("Error while generating query!");
-            throw new RuntimeException(e);
-        }
+        Object idValue = EntityUtils.getFieldValue(idColumnField, entity);
 
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder

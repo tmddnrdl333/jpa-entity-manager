@@ -4,8 +4,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Transient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import persistence.entity.EntityUtils;
 import persistence.sql.NameUtils;
 
 import java.lang.reflect.Field;
@@ -14,8 +13,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class UpdateQueryBuilder {
-    private static final Logger logger = LoggerFactory.getLogger(UpdateQueryBuilder.class);
-
     private UpdateQueryBuilder() {
     }
 
@@ -24,13 +21,7 @@ public class UpdateQueryBuilder {
         Field idColumnField = getIdColumnField(entity.getClass());
         String idColumnName = NameUtils.getColumnName(idColumnField);
         idColumnField.setAccessible(true);
-        Object idValue;
-        try {
-            idValue = idColumnField.get(entity);
-        } catch (IllegalAccessException e) {
-            logger.error("Error while generating query!");
-            throw new RuntimeException(e);
-        }
+        Object idValue = EntityUtils.getFieldValue(idColumnField, entity);
 
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder
@@ -68,7 +59,7 @@ public class UpdateQueryBuilder {
         for (Field field : fields) {
             String fieldName = NameUtils.getColumnName(field);
             field.setAccessible(true);
-            String fieldValue = String.valueOf(getFieldValue(field, entity));
+            String fieldValue = String.valueOf(EntityUtils.getFieldValue(field, entity));
             resultMap.put(fieldName, fieldValue);
         }
         return resultMap;
@@ -90,15 +81,6 @@ public class UpdateQueryBuilder {
             return false;
         }
         return true;
-    }
-
-    private static Object getFieldValue(Field field, Object entity) {
-        try {
-            return field.get(entity);
-        } catch (IllegalAccessException e) {
-            logger.error("Error while generating query!");
-            throw new RuntimeException(e);
-        }
     }
 
     private static Field getIdColumnField(Class<?> entityClass) {
