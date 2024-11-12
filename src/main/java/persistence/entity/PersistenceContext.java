@@ -8,19 +8,28 @@ public interface PersistenceContext {
      * @param id    식별자
      * @return 관리 중인 엔티티
      */
-    Object get(Class<?> clazz, Long id);
+    Object getEntity(Class<?> clazz, Long id);
 
     /**
      * 캐시 스토리지에 해당 엔티티를 생성/수정 한다.
      *
      * @param entity 생성/수정 대상 엔티티
      */
-    void put(Object entity);
+    void putEntity(Object entity);
 
     /**
      * 캐시 스토리지에서 해당 엔티티를 제거한다.
      *
      * @param entity 삭제 대상 엔티티
      */
-    void remove(Object entity);
+    void removeEntity(Object entity);
+
+    /**
+     * Entity 스냅샷 생성
+     *
+     * @param id     식별자
+     * @param entity 엔티티
+     * @return 스냅샷
+     */
+    Object getSnapshot(Long id, Object entity);
 }

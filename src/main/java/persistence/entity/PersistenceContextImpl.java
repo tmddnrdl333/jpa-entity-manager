@@ -5,40 +5,55 @@ import java.util.Map;
 
 public class PersistenceContextImpl implements PersistenceContext {
     private final Map<Class<?>, Map<Long, Object>> cacheStorage;
+    private final Map<Class<?>, Map<Long, EntitySnapshot>> snapshotStorage;
 
     public PersistenceContextImpl() {
         this.cacheStorage = new HashMap<>();
+        this.snapshotStorage = new HashMap<>();
+    }
+
+    private Map<Long, Object> getOrCreateEntityMap(Class<?> clazz) {
+        if (!this.cacheStorage.containsKey(clazz)) {
+            this.cacheStorage.put(clazz, new HashMap<>());
+        }
+        return this.cacheStorage.get(clazz);
+    }
+
+    private Map<Long, EntitySnapshot> getOrCreateSnapshotMap(Class<?> clazz) {
+        if (!this.snapshotStorage.containsKey(clazz)) {
+            this.snapshotStorage.put(clazz, new HashMap<>());
+        }
+        return this.snapshotStorage.get(clazz);
     }
 
     @Override
-    public Object get(Class<?> clazz, Long id) {
-        Map<Long, Object> entityMap = this.cacheStorage.get(clazz);
-        if (entityMap == null) {
-            return null;
-        }
+    public Object getEntity(Class<?> clazz, Long id) {
+        Map<Long, Object> entityMap = getOrCreateEntityMap(clazz);
         return entityMap.get(id);
     }
 
     @Override
-    public void put(Object entity) {
+    public void putEntity(Object entity) {
         Class<?> clazz = entity.getClass();
-        Map<Long, Object> entityMap;
-        if (this.cacheStorage.containsKey(clazz)) {
-            entityMap = this.cacheStorage.get(clazz);
-        } else {
-            entityMap = new HashMap<>();
-            this.cacheStorage.put(clazz, entityMap);
-        }
-        entityMap.put(EntityUtils.getIdValue(entity), entity);
+        Long idValue = EntityUtils.getIdValue(entity);
+
+        Map<Long, Object> entityMap = getOrCreateEntityMap(clazz);
+        entityMap.put(idValue, entity);
+
+        Map<Long, EntitySnapshot> snapshotMap = getOrCreateSnapshotMap(clazz);
+        snapshotMap.put(idValue, EntitySnapshot.of(entity));
     }
 
     @Override
-    public void remove(Object entity) {
+    public void removeEntity(Object entity) {
         Class<?> clazz = entity.getClass();
-        if (!this.cacheStorage.containsKey(clazz)) {
-            throw new IllegalArgumentException("Unable to remove such entity!");
-        }
-        Map<Long, Object> entityMap = this.cacheStorage.get(clazz);
+        Map<Long, Object> entityMap = getOrCreateEntityMap(clazz);
         entityMap.remove(EntityUtils.getIdValue(entity));
+    }
+
+    @Override
+    public Object getSnapshot(Long id, Object entity) {
+        Class<?> clazz = entity.getClass();
+        return this.snapshotStorage.get(clazz).get(id);
     }
 }

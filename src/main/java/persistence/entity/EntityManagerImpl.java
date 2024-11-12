@@ -27,14 +27,14 @@ public class EntityManagerImpl implements EntityManager {
         }
 
         /* 관리 중인 엔티티라면 영속성 컨텍스트에서 꺼내서 반환 */
-        Object managedEntity = persistenceContext.get(clazz, id);
+        Object managedEntity = persistenceContext.getEntity(clazz, id);
         if (managedEntity != null) {
             return managedEntity;
         }
 
         /* 관리 중이지 않다면 DB 조회 */
         Object entity = entityLoader.find(clazz, id);
-        persistenceContext.put(entity);
+        persistenceContext.putEntity(entity);
         return entity;
     }
 
@@ -42,7 +42,7 @@ public class EntityManagerImpl implements EntityManager {
     public void persist(Object newEntity) {
         Long generatedKey = entityPersister.insert(newEntity);
         Object insertedEntity = entityLoader.find(newEntity.getClass(), generatedKey);
-        persistenceContext.put(insertedEntity);
+        persistenceContext.putEntity(insertedEntity);
     }
 
     @Override
