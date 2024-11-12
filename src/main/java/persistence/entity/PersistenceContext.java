@@ -1,5 +1,7 @@
 package persistence.entity;
 
+import java.util.Map;
+
 public interface PersistenceContext {
     /**
      * 관리하고 있는 엔티티를 캐싱된 스토리지에서 가져온다.
@@ -25,11 +27,9 @@ public interface PersistenceContext {
     void removeEntity(Object entity);
 
     /**
-     * Entity 스냅샷 생성
+     * 수정되었거나 삭제된 엔티티 맵 조회
      *
-     * @param id     식별자
-     * @param entity 엔티티
-     * @return 스냅샷
+     * @return 변경 대상 맵
      */
-    EntitySnapshot getSnapshot(Long id, Object entity);
+    Map<Class<?>, Map<Long, EntityState>> getCacheStates();
 }

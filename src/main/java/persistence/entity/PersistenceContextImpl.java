@@ -52,8 +52,26 @@ public class PersistenceContextImpl implements PersistenceContext {
     }
 
     @Override
-    public EntitySnapshot getSnapshot(Long id, Object entity) {
-        Class<?> clazz = entity.getClass();
-        return getOrCreateSnapshotMap(clazz).get(id);
+    public Map<Class<?>, Map<Long, EntityState>> getCacheStates() {
+        Map<Class<?>, Map<Long, EntityState>> cacheStates = new HashMap<>();
+
+        for (Map.Entry<Class<?>, Map<Long, EntitySnapshot>> snapshotMapEntry : this.snapshotStorage.entrySet()) {
+            Map<Long, Object> entityMap = getOrCreateEntityMap(snapshotMapEntry.getKey());
+            Map<Long, EntitySnapshot> snapshotMap = this.snapshotStorage.get(snapshotMapEntry.getKey());
+            cacheStates.put(snapshotMapEntry.getKey(), getStates(entityMap, snapshotMap));
+        }
+        return cacheStates;
+    }
+
+    private Map<Long, EntityState> getStates(Map<Long, Object> entityMap, Map<Long, EntitySnapshot> snapshotMap) {
+        Map<Long, EntityState> classStates = new HashMap<>();
+
+        for (Map.Entry<Long, EntitySnapshot> snapshotEntry : snapshotMap.entrySet()) {
+            Object cacheEntity = entityMap.get(snapshotEntry.getKey());
+            EntitySnapshot snapshot = snapshotEntry.getValue();
+            EntityState entityState = snapshot.compareAndGetState(cacheEntity);
+            classStates.put(snapshotEntry.getKey(), entityState);
+        }
+        return classStates;
     }
 }
