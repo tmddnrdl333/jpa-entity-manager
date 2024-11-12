@@ -2,6 +2,8 @@ package persistence.entity;
 
 import jdbc.JdbcTemplate;
 
+import java.util.Map;
+
 public class EntityManagerImpl implements EntityManager {
     private final EntityPersister entityPersister;
     private final EntityLoader entityLoader;
@@ -17,7 +19,19 @@ public class EntityManagerImpl implements EntityManager {
     }
 
     public void commitTransaction() {
-        /* TODO : 변경사항 감지 및 업데이트 쿼리 실행 */
+        Map<Class<?>, Map<Long, Object>> changedEntities = this.persistenceContext.getChangedEntities();
+        for (Map.Entry<Class<?>, Map<Long, Object>> changedEntitiesEntry : changedEntities.entrySet()) {
+            Class<?> entityClass = changedEntitiesEntry.getKey();
+            Map<Long, Object> changedEntityMap = changedEntitiesEntry.getValue();
+
+            for (Map.Entry<Long, Object> changedEntity : changedEntityMap.entrySet()) {
+                if (changedEntity.getValue() == null) {
+                    entityPersister.delete(entityClass, changedEntity.getKey());
+                } else {
+                    entityPersister.update(changedEntity.getValue());
+                }
+            }
+        }
     }
 
     @Override
@@ -47,6 +61,6 @@ public class EntityManagerImpl implements EntityManager {
 
     @Override
     public void remove(Object entity) {
-        entityPersister.delete(entity);
+        persistenceContext.removeEntity(entity);
     }
 }

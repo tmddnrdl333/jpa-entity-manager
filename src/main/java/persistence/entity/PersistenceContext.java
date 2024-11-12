@@ -27,9 +27,9 @@ public interface PersistenceContext {
     void removeEntity(Object entity);
 
     /**
-     * 수정되었거나 삭제된 엔티티 맵 조회
+     * 변경이 감지된 모든 엔티티 조회
      *
-     * @return 변경 대상 맵
+     * @return 수정/삭제 대상 엔티티 맵
      */
-    Map<Class<?>, Map<Long, EntityState>> getCacheStates();
+    Map<Class<?>, Map<Long, Object>> getChangedEntities();
 }

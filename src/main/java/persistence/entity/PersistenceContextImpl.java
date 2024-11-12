@@ -52,26 +52,38 @@ public class PersistenceContextImpl implements PersistenceContext {
     }
 
     @Override
-    public Map<Class<?>, Map<Long, EntityState>> getCacheStates() {
-        Map<Class<?>, Map<Long, EntityState>> cacheStates = new HashMap<>();
+    public Map<Class<?>, Map<Long, Object>> getChangedEntities() {
+        Map<Class<?>, Map<Long, Object>> cacheStates = new HashMap<>();
 
         for (Map.Entry<Class<?>, Map<Long, EntitySnapshot>> snapshotMapEntry : this.snapshotStorage.entrySet()) {
             Map<Long, Object> entityMap = getOrCreateEntityMap(snapshotMapEntry.getKey());
             Map<Long, EntitySnapshot> snapshotMap = this.snapshotStorage.get(snapshotMapEntry.getKey());
-            cacheStates.put(snapshotMapEntry.getKey(), getStates(entityMap, snapshotMap));
+            cacheStates.put(snapshotMapEntry.getKey(), getChangedEntitiesInType(entityMap, snapshotMap));
         }
         return cacheStates;
     }
 
-    private Map<Long, EntityState> getStates(Map<Long, Object> entityMap, Map<Long, EntitySnapshot> snapshotMap) {
-        Map<Long, EntityState> classStates = new HashMap<>();
+    private Map<Long, Object> getChangedEntitiesInType(Map<Long, Object> entityMap, Map<Long, EntitySnapshot> snapshotMap) {
+        Map<Long, Object> changedEntitiesInType = new HashMap<>();
 
         for (Map.Entry<Long, EntitySnapshot> snapshotEntry : snapshotMap.entrySet()) {
             Object cacheEntity = entityMap.get(snapshotEntry.getKey());
             EntitySnapshot snapshot = snapshotEntry.getValue();
             EntityState entityState = snapshot.compareAndGetState(cacheEntity);
-            classStates.put(snapshotEntry.getKey(), entityState);
+
+            switch (entityState) {
+                case MODIFIED:
+                    changedEntitiesInType.put(snapshotEntry.getKey(), cacheEntity);
+                    break;
+                case DELETED:
+                    changedEntitiesInType.put(snapshotEntry.getKey(), null);
+                    break;
+                case UNCHANGED:
+                default:
+                    break;
+            }
         }
-        return classStates;
+
+        return changedEntitiesInType;
     }
 }
