@@ -40,10 +40,19 @@
 
 ### 2-1. EntityPersister 구현
 
-- [ ] PersistenceContext, EntityManager 추상화 설계 및 인터페이스 작성
-- [ ] PersistenceContext 구현
-- [ ] EntityPersister 구현
-  - [ ] 관리할 매핑 정보 작성
-  - [ ] update 구현
-  - [ ] insert 구현
-  - [ ] delete 구현
+- [x] PersistenceContext, EntityManager 추상화 설계 및 인터페이스 작성
+- [x] PersistenceContext 구현
+- [x] EntityPersister 구현
+  - [x] 관리할 매핑 정보 작성
+  - [x] update 구현
+  - [x] insert 구현
+  - [x] delete 구현
+
+### 2-2. EntityLoader 구현
+
+- [x] EntityLoader 구현
+
+### 2-3. Persistence Context, Dirty Check
+
+- [ ] data snapshot 구현
+- [ ] dirty check 로 변경 사항 쿼리 생성 구현
