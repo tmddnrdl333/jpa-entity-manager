@@ -22,8 +22,8 @@ public class EntityPersister {
         return jdbcTemplate.executeAndReturnGeneratedKey(insertQuery);
     }
 
-    public void delete(Object entity) {
-        String deleteQuery = DeleteQueryBuilder.generateQuery(entity.getClass(), entity);
+    public void delete(Class<?> clazz, Long idValue) {
+        String deleteQuery = DeleteQueryBuilder.generateQuery(clazz, idValue);
         jdbcTemplate.execute(deleteQuery);
     }
 }
