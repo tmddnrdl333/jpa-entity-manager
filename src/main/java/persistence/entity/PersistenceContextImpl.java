@@ -45,7 +45,9 @@ public class PersistenceContextImpl implements PersistenceContext {
     public void removeEntity(Object entity) {
         Class<?> clazz = entity.getClass();
         Map<Long, EntityEntry> entryMap = getOrCreateEntryMap(clazz);
-        entryMap.remove(EntityUtils.getIdValue(entity));
+        Long idValue = EntityUtils.getIdValue(entity);
+        EntityEntry entityEntry = entryMap.get(idValue);
+        entityEntry.updateStatus(EntityStatus.DELETED);
     }
 
     @Override

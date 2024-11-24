@@ -23,6 +23,10 @@ public class EntityEntry {
         return status;
     }
 
+    public void updateStatus(EntityStatus status) {
+        this.status = status;
+    }
+
     public EntitySnapshot getSnapshot() {
         return snapshot;
     }
